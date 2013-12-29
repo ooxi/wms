@@ -40,12 +40,13 @@ module.exports = function(width, height) {
 		
 		for (var iy = 0; iy < height; ++iy) {
 			row.push({
-				x:		ix,
-				y:		iy,
+				x:			ix,
+				y:			iy,
 				
-				is:		'unknown',
-				complete:	false,
-				ship:		0.5
+				is:			'unknown',
+				complete:		false,
+				ship:			0.5,
+				how_many_can_be_placed:	4
 			});
 		}
 		
@@ -71,13 +72,36 @@ module.exports = function(width, height) {
 			return {
 				x:		x,
 				y:		y,
-				is:		'water',
-				complete:	true,
-				ship:		0
+				
+				is:			'water',
+				complete:		true,
+				ship:			0,
+				how_many_can_be_placed:	0
 			};
 		}
 		return field[x][y];
 	};
+	
+	/**
+	 * @return All unknown fields
+	 */
+	var get_unknown_fields = function() {
+		var unknown = [];
+		
+		for (var x = 0; x < width; ++x) {
+			for (var y = 0; y < height; ++y) {
+				if ('unknown' === field[x][y].is) {
+					unknown.push(field[x][y]);
+				}
+			}
+		}
+		
+		return unknown;
+	};
+	
+	
+	
+	
 
 	/**
 	 * If a ship is sunk all ship fields next to it have to be finish
@@ -254,21 +278,147 @@ module.exports = function(width, height) {
 	
 	
 	
+	/**
+	 * @return Alive enemy ships
+	 */
+	var get_remaining_enemy_ships = function() {
+		return {
+			5:	1,
+			4:	2,
+			3:	3,
+			2:	4
+		};
+	};
+	
+	
+	
+	/**
+	 * Tries to find fields which can never be populated by a ship and marks
+	 * them as water (for example an unknown field which is surrounded by
+	 * water
+	 */
+	var update_unreachable_fields = function() {
+		var updated = false;
+		
+		
+		/* @return Number of fields available in one direction
+		 */
+		var get_available = function(x, y, dx, dy) {
+			var available = 0;
+			
+			for (ix = x, iy = y; ix >= 0 && ix < width && iy >= 0 && iy < height && 'water' !== get(ix, iy).is; ix += dx, iy += dy) {
+//				messages.push(''+ BoardUtilities.IntegerToColumn(ix) +':'+ BoardUtilities.IntegerToRow(iy) +' is available (is '+ get(ix, iy).is +')');
+				available++;
+			}
+			return available - 1;
+		};
+		
+		/* @return true iff a ship of size `length' can somehow be
+		 *     placed that it reaches this field
+		 */
+		var can_place = function(ships, x, y) {
+			var top_available = get_available(x, y, 0, -1);
+			var bottom_available = get_available(x, y, 0, +1);
+			var left_available = get_available(x, y, -1, 0);
+			var right_available = get_available(x, y, +1, 0);
+			
+			var horizontal = left_available + 1 + right_available;
+			var vertical = top_available + 1 + bottom_available;
+//			messages.push('horizontal available at '+ BoardUtilities.IntegerToColumn(x) +':'+ BoardUtilities.IntegerToRow(y) +': '+ horizontal);
+//			messages.push('vertical available at '+ BoardUtilities.IntegerToColumn(x) +':'+ BoardUtilities.IntegerToRow(y) +': '+ vertical);
+			
+			/* Can at least one ship be placed?
+			 */
+			var how_many_can_be_placed = 0;
+			
+			for (var i = 0; i < ships.length; ++i) {
+				var ship = ships[i];
+				
+				if (ship <= horizontal || ship <= vertical) {
+					how_many_can_be_placed++;
+				}
+			}
+			get(x, y).how_many_can_be_placed = how_many_can_be_placed;
+			return how_many_can_be_placed > 0;
+		};
+		
+		/* Get remaining enemy ship classes
+		 */
+		var ships = Object.keys(get_remaining_enemy_ships());
+		
+		for (var x = 0; x < width; ++x) {
+			for (var y = 0; y < height; ++y) {
+				var cell = get(x, y);
+				
+				if ('unknown' !== cell.is) {
+					continue;
+				}
+				
+				if (!can_place(ships, x, y)) {
+					messages.push('Cannot place ship at '+ BoardUtilities.IntegerToColumn(x) +':'+ BoardUtilities.IntegerToRow(y));
+					updated = true;
+					cell.is = 'water';
+					cell.complete = true;
+					cell.ship = 0;
+				}
+			}
+		}
+		
+		
+		/* If we updated at least one field the method should check once
+		 * more, perhaps now new fields are unreachable
+		 */
+		if (updated) {
+			messages.push('At least one field changed, will search again');
+			update_unreachable_fields();
+		}
+	};
+	
+	
+	
 	
 	
 	this.getNextTarget = function() {
 		++count;
 		
+		
 		/* Goes through the field and shots at next best looking cell
 		 */
-		var reference_targets = [{
-			x:	parseInt(Math.random() * width),
-			y:	parseInt(Math.random() * height)
-		}];
-		var reference_propability = get(
-			reference_targets[0].x,
-			reference_targets[0].y
-		).ship;
+		var reference_targets = [BoardUtilities.getRandomElement(
+			get_unknown_fields()
+		)];
+	
+	
+		/* Compares the reference propability with another field
+		 * 
+		 * @return +1 if field is better, -1 is weaker 0 if equal
+		 */
+		var compare_to_reference = function(field) {
+			var reference = get(
+				reference_targets[0].x,
+				reference_targets[0].y
+			);
+		
+			if (		!field.hasOwnProperty('ship')
+				||	!field.hasOwnProperty('how_many_can_be_placed')) {
+				
+				throw 'Invalid field '+ JSON.stringify(field);
+			}
+			
+			if (field.ship > reference.ship) {
+				return +1;
+			} else if (field.ship < reference.ship) {
+				return -1;
+			}
+			
+			if (field.how_many_can_be_placed > reference.how_many_can_be_placed) {
+				return +1;
+			} else if (field.how_many_can_be_placed < reference.how_many_can_be_placed) {
+				return -1;
+			}
+			
+			return 0;
+		};
 		
 		
 		for (var x = 0; x < width; ++x) {
@@ -276,18 +426,18 @@ module.exports = function(width, height) {
 				var cell = field[x][y];
 				
 				if ('unknown' === cell.is) {
+					var cmp = compare_to_reference(cell);
 					
 					/* If cell is better than create new
 					 * reference
 					 */
-					if (cell.ship > reference_propability) {
-						reference_propability = cell.ship;
+					if (cmp > 0) {
 						reference_targets = [cell];
 					
 					/* If it is equally good, add to
 					 * reference targets
 					 */
-					} else if (cell.ship === reference_propability) {
+					} else if (cmp === 0) {
 						reference_targets.push(cell);
 					}
 				}
@@ -297,13 +447,18 @@ module.exports = function(width, height) {
 		/* Choose one target by random (reference_targets will contain
 		 * at least one element)
 		 */
-		return BoardUtilities.getRandomElement(reference_targets);
+		var result = BoardUtilities.getRandomElement(reference_targets);
+		var cell = get(result.x, result.y);
+		if ('unknown' !== cell.is) {
+			throw 'Wanted to shoot at '+ JSON.stringify(cell) +' of '+ JSON.stringify(reference_targets);
+		}
+		messages.push('Will target '+ BoardUtilities.IntegerToColumn(result.x) +':'+ BoardUtilities.IntegerToRow(result.y));
+		return result;
 	};
 	
 	
 	
 	this.setResult = function(x, y, is) {
-		messages = [];
 		
 		if ((x < 0) || (x >= field.length) || (y < 0) || (y >= field[0].length)) {
 			throw 'Invalid position '+ x +':'+ y;
@@ -324,6 +479,7 @@ module.exports = function(width, height) {
 			cell.is = 'ship';
 			cell.ship = 1;
 			update_ship_propabilities(x, y);
+			update_unreachable_fields();
 			
 		/* Wenn ship is sunk we can declare every field around it as
 		 * water
@@ -333,6 +489,8 @@ module.exports = function(width, height) {
 			cell.complete = true;	// @todo Alle angeschlossenen Felder auf complete setzen und Wahrscheinlichkeiten aktualisieren
 			cell.ship = 1;
 			mark_ship_complete(x, y);
+			update_unreachable_fields();
+			
 		} else {
 			throw new 'Invalid is `'+ is +'\'';
 		}
@@ -354,7 +512,7 @@ module.exports = function(width, height) {
 			
 			for (var x = 0; x < width; ++x) {
 				var cell = field[x][y];
-				html += '<td style="width: 30px; height: 30px; text-align: center; vertical-align: middle; background-color: '+ ('unknown' === cell.is ? 'white' : ('ship' === cell.is ? 'red' : 'blue')) +'">'+ cell.ship +'</td>';
+				html += '<td style="width: 30px; height: 30px; text-align: center; vertical-align: middle; background-color: '+ ('unknown' === cell.is ? 'white' : ('ship' === cell.is ? 'red' : 'blue')) +'">'+ cell.ship +' ('+ cell.how_many_can_be_placed +')</td>';
 			}
 			html += '</tr>';
 		}
@@ -370,6 +528,7 @@ module.exports = function(width, height) {
 			
 			html += '</ul>';
 		}
+		messages = [];
 		
 		return html;
 	};

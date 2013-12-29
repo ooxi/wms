@@ -217,10 +217,10 @@ module.exports = function(server, aggressive, defensive) {
 					draw,
 					
 					function(cb) {
-//						fs.appendFileSync(
-//							logfile,
-//							'<table><tr><td>'+ aggressive.getHtml() +'</td><td align="right">'+ defensive.getHtml() +'</td></tr></table>'
-//						);
+						fs.appendFileSync(
+							logfile,
+							'<table><tr><td valign="top">'+ aggressive.getHtml() +'</td><td valign="top" align="right">'+ defensive.getHtml() +'</td></tr></table>'
+						);
 						cb(null);
 					}
 				], cb);
