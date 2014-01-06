@@ -23,7 +23,7 @@ var async = require('async');
 var fs = require('fs');
 var request = require('request');
 
-var BoardUtilities = require('./BoardUtilities.js');
+var BoardUtilities = require('./../common/BoardUtilities.js');
 
 var NEXT_CLIENT_ID = 0;
 
@@ -44,6 +44,7 @@ module.exports = function(server, aggressive, defensive) {
 	var name = NEXT_CLIENT_ID++;
 	var game_id = null;
 	var token = null;
+	var field = null;
 
 
 
@@ -100,8 +101,9 @@ module.exports = function(server, aggressive, defensive) {
 				var players = game.playerCount;
 				var finished = game.hasFinished;
 				var id = game.gameId;
+				var debug = (''+ id).indexOf('2342') === 0;
 				
-				if ((players < 2) && !finished) {
+				if ((players < 2) && !finished && !debug) {
 					join_game(id, cb);
 					return;
 				}
@@ -130,7 +132,7 @@ module.exports = function(server, aggressive, defensive) {
 			body = JSON.parse(body);
 			
 			if ('JOINED' !== body.status) {
-				cb(body.status +' ('+ body.reason +')');
+				cb('Cannot join: '+ body.status +' ('+ body.reason +')');
 				return;
 			}
 			
@@ -165,22 +167,41 @@ module.exports = function(server, aggressive, defensive) {
 			cb(null);
 		});
 	};
-
-
+	
+	
+	
+	
+	
+	/**
+	 * Calculates own ship position
+	 */
+	var get_field = function(cb) {
+		defensive.getField(function(err, f) {
+			if (err) {
+				cb(err);
+			} else {
+				field = f;
+				cb(null);
+			}
+		});
+	};
 
 
 
 	/**
-	 * Schiffaufstellung
+	 * Tell server our ship positions
 	 */
 	var spawn_ships = function(cb) {
-
+		log('Will spwan ships');
+		
 		request({
 			url:	server +'/'+ game_id +'/setup/'+ token,
 			method:	'PUT',
-			body:	JSON.stringify(defensive.getField())
+			body:	JSON.stringify(field.getFlat())
 			
 		}, function(error, response, body) {
+			console.log('Ships spwaned');
+			
 			if (error) {
 				cb(error);
 				return;
@@ -204,6 +225,7 @@ module.exports = function(server, aggressive, defensive) {
 	 * Plays until game finished
 	 */
 	var play = function(cb) {
+		log('Started playing :)');
 		var logfile = 'client_'+ name +'.html';
 		
 		if (fs.existsSync(logfile)) {
@@ -219,7 +241,7 @@ module.exports = function(server, aggressive, defensive) {
 					function(cb) {
 						fs.appendFileSync(
 							logfile,
-							'<table><tr><td valign="top">'+ aggressive.getHtml() +'</td><td valign="top" align="right">'+ defensive.getHtml() +'</td></tr></table>'
+							'<table><tr><td valign="top">'+ aggressive.getHtml() +'</td><td valign="top" align="right">'+ field.getHtml() +'</td></tr></table>'
 						);
 						cb(null);
 					}
@@ -256,7 +278,7 @@ module.exports = function(server, aggressive, defensive) {
 			/* Remember enemy shot
 			 */
 			if (body.hasOwnProperty('enemyshot')) {
-				defensive.setEnemyShot(
+				field.setEnemyShot(
 					BoardUtilities.ColumnToInteger(body.enemyshot.x),
 					BoardUtilities.RowToInteger(body.enemyshot.y)
 				);
@@ -284,7 +306,7 @@ module.exports = function(server, aggressive, defensive) {
 	
 	
 	/**
-	 * Fuehrt den naechsten Schuss durch
+	 * Executes next shot
 	 */
 	var draw = function(cb) {
 		log('Will draw...');
@@ -334,6 +356,7 @@ module.exports = function(server, aggressive, defensive) {
 		async.series([
 			join_or_create_game,
 			after_start,
+			get_field,
 			spawn_ships,
 			play
 		], function(err) {

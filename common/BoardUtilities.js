@@ -72,6 +72,12 @@ module.exports = {
 	
 	
 	
+	PositionToName: function(x, y) {
+		return this.IntegerToColumn(x) +':'+ this.IntegerToRow(y);
+	},
+	
+	
+	
 	getRandomElement: function(array) {
 		return array[Math.floor(Math.random() * array.length)];
 	}

@@ -19,15 +19,17 @@
  * 
  *  3. This notice may not be removed or altered from any source distribution.
  */
+var Configuration = require('./../common/Configuration.js');
+
 var Client = require('./Client.js');
 
 var Aggressive = require('./Aggressive.js');
-var Defensive = require('./Defensive.js');
+var Defensive = require('./RandomDefensive.js');
 
 var argv = require('optimist')
 	.demand('server').describe('server', 'Server URL including schema')
-	.default('width', 10).describe('width', 'Width of board')
-	.default('height', 10).describe('height', 'Height of board')
+//	.default('width', 10).describe('width', 'Width of board')
+//	.default('height', 10).describe('height', 'Height of board')
 	.default('clients', 2).describe('clients', 'Number of clients to create')
 .argv;
 
@@ -35,14 +37,17 @@ var argv = require('optimist')
 
 /* Initialize client
  */
+var configuration = new Configuration();
 var clients = [];
 
 for (var i = 0; i < argv.clients; ++i) {
+	var dimension = configuration.getDimension();
+	var ships = configuration.getShips();
 	
 	clients.push(new Client(
 		argv.server,
-		new Aggressive(argv.width, argv.height),
-		new Defensive(argv.width, argv.height)
+		new Aggressive(dimension.width, dimension.height),
+		new Defensive(ships, dimension.width, dimension.height)
 	));
 }
 

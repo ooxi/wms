@@ -19,18 +19,29 @@
  * 
  *  3. This notice may not be removed or altered from any source distribution.
  */
-var request = require('request');
-
-var argv = require('optimist')
-	.demand('server')
-	.demand('count')
-.argv;
+var http = require('http');
 
 
 
 
 
-for (var i = 0; i < argv.count; ++i) {
-	var id = Math.round(Math.random() * 10000000);
-	request.put(argv.server +'/'+ id);
-}
+module.exports = function(handler) {
+	
+	return http.createServer(function(req, res) {
+		req.setEncoding('UTF-8');
+		var data = '';
+		
+		req.addListener('data', function(chunk) {
+			data += chunk;
+		});
+		
+		req.addListener('end', function() {
+			try {
+				req.json = data.length > 0 ? JSON.parse(data) : false;
+				handler(req, res);
+			} catch (e) {
+				console.error('Internal error', e);
+			}
+		});
+	});
+};

@@ -19,19 +19,19 @@
  * 
  *  3. This notice may not be removed or altered from any source distribution.
  */
-var BoardUtilities = require('./BoardUtilities.js');
+var BoardUtilities = require('./../common/BoardUtilities.js');
 
 
 
 /**
- * Haelt Informationen ueber das Spielfeld mit einer Bewertung, welche Felder
- * mit welcher Wahrscheinlichkeit bestimmte Informationen enthalten
+ * Keeps information about game board with rating which cells contain what
+ * type with a certain propability
  */
 module.exports = function(width, height) {
 	
 	
-	/* Initial sind alle Felder unbekannt und haben die gleiche
-	 * Wahrscheinlichkeit ein Schiff zu enthalten
+	/* Initially all cells are unknown and equally probably will contain a
+	 * ship
 	 */
 	var field = [];
 	
@@ -512,7 +512,7 @@ module.exports = function(width, height) {
 			
 			for (var x = 0; x < width; ++x) {
 				var cell = field[x][y];
-				html += '<td style="width: 30px; height: 30px; text-align: center; vertical-align: middle; background-color: '+ ('unknown' === cell.is ? 'white' : ('ship' === cell.is ? 'red' : 'blue')) +'">'+ cell.ship +' ('+ cell.how_many_can_be_placed +')</td>';
+				html += '<td style="width: 50px; height: 50px; text-align: center; vertical-align: middle; background-color: '+ ('unknown' === cell.is ? 'gray' : ('ship' === cell.is ? 'red' : 'blue')) +'">'+ cell.ship +' ('+ cell.how_many_can_be_placed +')</td>';
 			}
 			html += '</tr>';
 		}
